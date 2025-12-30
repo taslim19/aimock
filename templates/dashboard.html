@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Mock Interview System{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="container">
+        <h1>Welcome, {{ current_user.username }}!</h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-info">
+                    <h3>{{ total_interviews }}</h3>
+                    <p>Total Interviews</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <h3>{{ completed_interviews }}</h3>
+                    <p>Completed</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-info">
+                    <h3>{{ avg_score }}%</h3>
+                    <p>Average Score</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-actions">
+            <a href="{{ url_for('domains') }}" class="btn btn-primary btn-large">Start New Interview</a>
+        </div>
+
+        <div class="recent-interviews">
+            <h2>Recent Interviews</h2>
+            {% if interviews %}
+                <div class="interviews-list">
+                    {% for interview in interviews %}
+                        <div class="interview-card">
+                            <div class="interview-header">
+                                <h3>{{ interview.domain }}</h3>
+                                <span class="interview-status status-{{ interview.status }}">{{ interview.status }}</span>
+                            </div>
+                            <div class="interview-details">
+                                <p><strong>Started:</strong> {{ interview.started_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                                {% if interview.overall_score %}
+                                    <p><strong>Score:</strong> {{ "%.2f"|format(interview.overall_score) }}%</p>
+                                {% endif %}
+                            </div>
+                            <div class="interview-actions">
+                                {% if interview.status == 'completed' %}
+                                    <a href="{{ url_for('results', interview_id=interview.id) }}" class="btn btn-secondary">View Results</a>
+                                {% else %}
+                                    <a href="{{ url_for('interview', interview_id=interview.id) }}" class="btn btn-primary">Continue</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-data">No interviews yet. <a href="{{ url_for('domains') }}">Start your first interview!</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

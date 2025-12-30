@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Select Domain - AI Mock Interview System{% endblock %}
+
+{% block content %}
+<div class="domains-container">
+    <div class="container">
+        <h1>Select Interview Domain</h1>
+        <p class="section-description">Choose a domain to start your mock interview. Questions will be tailored to your selection.</p>
+        
+        <div class="domains-grid">
+            {% for domain in domains %}
+                <div class="domain-card" data-domain="{{ domain.name }}">
+                    <div class="domain-icon">
+                        {% if 'IT' in domain.name or 'Software' in domain.name %}
+                            💻
+                        {% elif 'HR' in domain.name %}
+                            👥
+                        {% elif 'Finance' in domain.name %}
+                            💰
+                        {% elif 'Management' in domain.name %}
+                            📈
+                        {% else %}
+                            📋
+                        {% endif %}
+                    </div>
+                    <h3>{{ domain.name }}</h3>
+                    <p>{{ domain.description }}</p>
+                    <button class="btn btn-primary btn-block start-interview-btn" data-domain="{{ domain.name }}">Start Interview</button>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div id="loadingModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="spinner"></div>
+        <p>Preparing your interview questions...</p>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.start-interview-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const domain = this.getAttribute('data-domain');
+        const modal = document.getElementById('loadingModal');
+        modal.style.display = 'flex';
+
+        try {
+            const response = await fetch('/start-interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ domain: domain })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.href = data.redirect;
+            } else {
+                modal.style.display = 'none';
+                alert('Error starting interview: ' + data.message);
+            }
+        } catch (error) {
+            modal.style.display = 'none';
+            alert('An error occurred. Please try again.');
+        }
+    });
+});
+</script>
+{% endblock %}
+

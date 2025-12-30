@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Interview - AI Mock Interview System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .interview-progress {
+        margin-bottom: 20px;
+    }
+    .progress-bar {
+        width: 100%;
+        height: 10px;
+        background: #e0e0e0;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: #4CAF50;
+        transition: width 0.3s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="interview-container">
+    <div class="container">
+        <div class="interview-header">
+            <h1>{{ interview.domain }} Interview</h1>
+            <div class="interview-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <p id="progressText">Question 0 of {{ questions|length }}</p>
+            </div>
+        </div>
+
+        <div id="questionContainer" class="question-container">
+            <!-- Questions will be loaded here -->
+        </div>
+
+        <div id="evaluationContainer" class="evaluation-container" style="display: none;">
+            <!-- Evaluation results will be shown here -->
+        </div>
+
+        <div class="interview-actions">
+            <button id="nextQuestionBtn" class="btn btn-primary" style="display: none;">Next Question</button>
+            <button id="completeInterviewBtn" class="btn btn-success" style="display: none;">Complete Interview</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const interviewId = {{ interview.id }};
+const questions = {{ questions|tojson }};
+let currentQuestionIndex = 0;
+let answeredQuestions = 0;
+
+function loadQuestion() {
+    if (currentQuestionIndex >= questions.length) {
+        showCompleteButton();
+        return;
+    }
+
+    const question = questions[currentQuestionIndex];
+    const container = document.getElementById('questionContainer');
+    
+    container.innerHTML = `
+        <div class="question-card">
+            <div class="question-header">
+                <h2>Question ${currentQuestionIndex + 1}</h2>
+                <span class="question-type">${question.question_type || 'General'}</span>
+            </div>
+            <div class="question-text">
+                <p>${question.question_text}</p>
+            </div>
+            <div class="answer-section">
+                <label for="answerText">Your Answer:</label>
+                <textarea id="answerText" rows="8" placeholder="Type your answer here..."></textarea>
+            </div>
+            <button id="submitAnswerBtn" class="btn btn-primary">Submit Answer</button>
+        </div>
+    `;
+
+    document.getElementById('submitAnswerBtn').addEventListener('click', submitAnswer);
+    updateProgress();
+}
+
+function updateProgress() {
+    const progress = ((currentQuestionIndex) / questions.length) * 100;
+    document.getElementById('progressFill').style.width = progress + '%';
+    document.getElementById('progressText').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+}
+
+async function submitAnswer() {
+    const answerText = document.getElementById('answerText').value.trim();
+    
+    if (!answerText) {
+        alert('Please provide an answer before submitting.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitAnswerBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Evaluating...';
+
+    try {
+        const response = await fetch('/submit-answer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                question_id: questions[currentQuestionIndex].id,
+                answer_text: answerText
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            showEvaluation(data.evaluation);
+            answeredQuestions++;
+            
+            if (currentQuestionIndex < questions.length - 1) {
+                document.getElementById('nextQuestionBtn').style.display = 'block';
+            } else {
+                showCompleteButton();
+            }
+        } else {
+            alert('Error submitting answer: ' + data.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Answer';
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Answer';
+    }
+}
+
+function showEvaluation(evaluation) {
+    const container = document.getElementById('evaluationContainer');
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div class="evaluation-card">
+            <h3>Evaluation Results</h3>
+            <div class="scores-grid">
+                <div class="score-item">
+                    <label>Clarity</label>
+                    <div class="score-value">${evaluation.clarity}%</div>
+                </div>
+                <div class="score-item">
+                    <label>Accuracy</label>
+                    <div class="score-value">${evaluation.accuracy}%</div>
+                </div>
+                <div class="score-item">
+                    <label>Communication</label>
+                    <div class="score-value">${evaluation.communication}%</div>
+                </div>
+                <div class="score-item">
+                    <label>Confidence</label>
+                    <div class="score-value">${evaluation.confidence}%</div>
+                </div>
+                <div class="score-item overall">
+                    <label>Overall Score</label>
+                    <div class="score-value">${evaluation.overall}%</div>
+                </div>
+            </div>
+            <div class="feedback-section">
+                <h4>Feedback</h4>
+                <p>${evaluation.feedback}</p>
+            </div>
+            <div class="strengths-improvements">
+                <div class="strengths">
+                    <h4>Strengths</h4>
+                    <ul>
+                        ${evaluation.strengths.map(s => `<li>${s}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="improvements">
+                    <h4>Areas for Improvement</h4>
+                    <ul>
+                        ${evaluation.improvements.map(i => `<li>${i}</li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function showCompleteButton() {
+    document.getElementById('completeInterviewBtn').style.display = 'block';
+    document.getElementById('nextQuestionBtn').style.display = 'none';
+}
+
+document.getElementById('nextQuestionBtn').addEventListener('click', function() {
+    currentQuestionIndex++;
+    document.getElementById('evaluationContainer').style.display = 'none';
+    document.getElementById('nextQuestionBtn').style.display = 'none';
+    loadQuestion();
+});
+
+document.getElementById('completeInterviewBtn').addEventListener('click', async function() {
+    if (answeredQuestions < questions.length) {
+        if (!confirm('You haven\'t answered all questions. Complete interview anyway?')) {
+            return;
+        }
+    }
+
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Completing...';
+
+    try {
+        const response = await fetch(`/complete-interview/${interviewId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            window.location.href = data.redirect;
+        } else {
+            alert('Error completing interview: ' + data.message);
+            btn.disabled = false;
+            btn.textContent = 'Complete Interview';
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Complete Interview';
+    }
+});
+
+// Load first question
+loadQuestion();
+</script>
+{% endblock %}
+

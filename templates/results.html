@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Interview Results - AI Mock Interview System{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <div class="container">
+        <div class="results-header">
+            <h1>Interview Results</h1>
+            <p class="interview-info">{{ interview.domain }} - {{ interview.completed_at.strftime('%B %d, %Y at %H:%M') }}</p>
+        </div>
+
+        <div class="overall-score-card">
+            <h2>Overall Performance</h2>
+            <div class="score-circle">
+                <div class="score-value-large">{{ "%.1f"|format(interview.overall_score) }}%</div>
+                <div class="score-label">Overall Score</div>
+            </div>
+        </div>
+
+        <div class="detailed-results">
+            <h2>Detailed Evaluation</h2>
+            {% for item in answers_data %}
+                <div class="result-card">
+                    <div class="result-question">
+                        <h3>Question {{ loop.index }}</h3>
+                        <p>{{ item.question.question_text }}</p>
+                    </div>
+                    
+                    {% if item.answer %}
+                        <div class="result-answer">
+                            <h4>Your Answer:</h4>
+                            <p>{{ item.answer.answer_text }}</p>
+                        </div>
+
+                        <div class="result-scores">
+                            <div class="score-breakdown">
+                                <div class="score-item">
+                                    <span class="score-label">Clarity:</span>
+                                    <span class="score-value">{{ "%.1f"|format(item.answer.clarity_score) }}%</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">Accuracy:</span>
+                                    <span class="score-value">{{ "%.1f"|format(item.answer.accuracy_score) }}%</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">Communication:</span>
+                                    <span class="score-value">{{ "%.1f"|format(item.answer.communication_score) }}%</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">Confidence:</span>
+                                    <span class="score-value">{{ "%.1f"|format(item.answer.confidence_score) }}%</span>
+                                </div>
+                                <div class="score-item overall">
+                                    <span class="score-label">Overall:</span>
+                                    <span class="score-value">{{ "%.1f"|format(item.answer.overall_score) }}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="result-feedback">
+                            <h4>Feedback:</h4>
+                            <p>{{ item.answer.feedback }}</p>
+                        </div>
+
+                        <div class="result-insights">
+                            <div class="strengths-box">
+                                <h4>Strengths</h4>
+                                <ul>
+                                    {% for strength in item.answer.strengths|from_json %}
+                                        <li>{{ strength }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <div class="improvements-box">
+                                <h4>Areas for Improvement</h4>
+                                <ul>
+                                    {% for improvement in item.answer.improvements|from_json %}
+                                        <li>{{ improvement }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="no-answer">No answer submitted for this question.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="results-actions">
+            <a href="{{ url_for('domains') }}" class="btn btn-primary">Start New Interview</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
