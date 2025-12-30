@@ -100,13 +100,24 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     };
     
     recognition.onerror = function(event) {
-        console.error('Speech recognition error:', event.error);
+        console.error('Speech recognition error:', event.error, event);
         const statusEl = document.getElementById('recordingStatus');
         if (statusEl) {
             statusEl.textContent = 'Error: ' + event.error;
             statusEl.style.color = '#e74c3c';
         }
+        
+        // Don't auto-stop on certain errors
+        if (event.error === 'no-speech' || event.error === 'audio-capture') {
+            // These are recoverable, keep trying
+            return;
+        }
+        
         stopRecording();
+    };
+    
+    recognition.onstart = function() {
+        console.log('Speech recognition started');
     };
     
     recognition.onend = function() {
@@ -167,61 +178,89 @@ function loadQuestion() {
     const stopBtn = document.getElementById('stopRecordingBtn');
     
     if (startBtn) {
-        startBtn.addEventListener('click', startRecording);
+        startBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Start recording button clicked');
+            startRecording();
+        };
+        console.log('Start button event listener attached');
+    } else {
+        console.error('Start recording button not found!');
     }
+    
     if (stopBtn) {
-        stopBtn.addEventListener('click', stopRecording);
+        stopBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Stop recording button clicked');
+            stopRecording();
+        };
     }
     
     // Hide voice controls if not supported
     if (!recognition) {
+        console.warn('Speech recognition not available');
         const voiceControls = document.querySelector('.voice-controls');
         if (voiceControls) {
             voiceControls.style.display = 'none';
         }
+    } else {
+        console.log('Speech recognition initialized successfully');
     }
     
     updateProgress();
 }
 
 function startRecording() {
+    console.log('startRecording called, recognition:', recognition, 'isRecording:', isRecording);
+    
     if (!recognition) {
         alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
         return;
     }
     
-    // Request microphone permission
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(function(stream) {
-            // Permission granted, stop the stream and start recognition
-            stream.getTracks().forEach(track => track.stop());
-            
-            try {
-                recognition.start();
-                isRecording = true;
-                const startBtn = document.getElementById('startRecordingBtn');
-                const stopBtn = document.getElementById('stopRecordingBtn');
-                const statusEl = document.getElementById('recordingStatus');
-                
-                if (startBtn) startBtn.style.display = 'none';
-                if (stopBtn) stopBtn.style.display = 'inline-block';
-                if (statusEl) {
-                    statusEl.textContent = '🔴 Recording...';
-                    statusEl.style.color = '#e74c3c';
-                }
-            } catch (e) {
-                console.error('Error starting recognition:', e);
-                if (e.name === 'InvalidStateError') {
-                    alert('Recording is already active. Please stop it first.');
-                } else {
-                    alert('Could not start voice recording: ' + e.message);
-                }
-            }
-        })
-        .catch(function(err) {
-            console.error('Microphone permission denied:', err);
-            alert('Microphone access is required for voice input. Please allow microphone access and try again.');
-        });
+    if (isRecording) {
+        console.log('Already recording, stopping first');
+        stopRecording();
+        setTimeout(startRecording, 500);
+        return;
+    }
+    
+    try {
+        console.log('Starting speech recognition...');
+        recognition.start();
+        isRecording = true;
+        
+        const startBtn = document.getElementById('startRecordingBtn');
+        const stopBtn = document.getElementById('stopRecordingBtn');
+        const statusEl = document.getElementById('recordingStatus');
+        
+        if (startBtn) {
+            startBtn.style.display = 'none';
+            console.log('Start button hidden');
+        }
+        if (stopBtn) {
+            stopBtn.style.display = 'inline-block';
+            console.log('Stop button shown');
+        }
+        if (statusEl) {
+            statusEl.textContent = '🔴 Recording...';
+            statusEl.style.color = '#e74c3c';
+            console.log('Status updated to recording');
+        }
+    } catch (e) {
+        console.error('Error starting recognition:', e);
+        isRecording = false;
+        
+        if (e.name === 'InvalidStateError') {
+            alert('Recording is already active. Please stop it first.');
+        } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+        } else {
+            alert('Could not start voice recording: ' + e.message + '\n\nError: ' + e.name);
+        }
+    }
 }
 
 function stopRecording() {
