@@ -76,14 +76,68 @@ function loadQuestion() {
             </div>
             <div class="answer-section">
                 <label for="answerText">Your Answer:</label>
-                <textarea id="answerText" rows="8" placeholder="Type your answer here..."></textarea>
+                <div class="answer-input-wrapper">
+                    <textarea id="answerText" rows="8" placeholder="Type your answer here or use voice input..."></textarea>
+                    <div class="voice-controls">
+                        <button id="startRecordingBtn" class="btn btn-secondary btn-voice" title="Start Voice Input">
+                            🎤 Start Recording
+                        </button>
+                        <button id="stopRecordingBtn" class="btn btn-secondary btn-voice" style="display: none;" title="Stop Recording">
+                            ⏹️ Stop Recording
+                        </button>
+                        <span id="recordingStatus" class="recording-status"></span>
+                    </div>
+                </div>
             </div>
             <button id="submitAnswerBtn" class="btn btn-primary">Submit Answer</button>
         </div>
     `;
 
     document.getElementById('submitAnswerBtn').addEventListener('click', submitAnswer);
+    
+    // Voice input handlers
+    if (recognition) {
+        document.getElementById('startRecordingBtn').addEventListener('click', startRecording);
+        document.getElementById('stopRecordingBtn').addEventListener('click', stopRecording);
+    } else {
+        // Hide voice buttons if not supported
+        document.querySelector('.voice-controls').style.display = 'none';
+    }
+    
     updateProgress();
+}
+
+function startRecording() {
+    if (!recognition) {
+        alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+        return;
+    }
+    
+    try {
+        recognition.start();
+        isRecording = true;
+        document.getElementById('startRecordingBtn').style.display = 'none';
+        document.getElementById('stopRecordingBtn').style.display = 'inline-block';
+        document.getElementById('recordingStatus').textContent = '🔴 Recording...';
+        document.getElementById('recordingStatus').style.color = '#e74c3c';
+    } catch (e) {
+        console.error('Error starting recognition:', e);
+        alert('Could not start voice recording. Please try again.');
+    }
+}
+
+function stopRecording() {
+    if (recognition && isRecording) {
+        recognition.stop();
+        isRecording = false;
+        document.getElementById('startRecordingBtn').style.display = 'inline-block';
+        document.getElementById('stopRecordingBtn').style.display = 'none';
+        document.getElementById('recordingStatus').textContent = 'Recording stopped';
+        document.getElementById('recordingStatus').style.color = '#27ae60';
+        setTimeout(() => {
+            document.getElementById('recordingStatus').textContent = '';
+        }, 2000);
+    }
 }
 
 function updateProgress() {
@@ -195,6 +249,10 @@ function showCompleteButton() {
 }
 
 document.getElementById('nextQuestionBtn').addEventListener('click', function() {
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
     currentQuestionIndex++;
     document.getElementById('evaluationContainer').style.display = 'none';
     document.getElementById('nextQuestionBtn').style.display = 'none';

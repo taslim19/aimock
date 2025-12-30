@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import json
 import random
@@ -48,7 +48,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     profile = db.relationship('UserProfile', backref='user', uselist=False, cascade='all, delete-orphan')
     interviews = db.relationship('Interview', backref='user', lazy=True, cascade='all, delete-orphan')
 
@@ -84,7 +84,7 @@ class Interview(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     domain = db.Column(db.String(100), nullable=False)
-    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='in_progress')  # in_progress, completed
     overall_score = db.Column(db.Float)
@@ -115,12 +115,12 @@ class Answer(db.Model):
     feedback = db.Column(db.Text)
     strengths = db.Column(db.Text)  # JSON array
     improvements = db.Column(db.Text)  # JSON array
-    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 # Routes
@@ -338,7 +338,7 @@ def complete_interview(interview_id):
         interview_obj.overall_score = overall_score
     
     interview_obj.status = 'completed'
-    interview_obj.completed_at = datetime.utcnow()
+    interview_obj.completed_at = datetime.now(timezone.utc)
     db.session.commit()
 
     # Update user profile statistics

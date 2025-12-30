@@ -576,6 +576,28 @@ body {
     border-color: #3498db;
 }
 
+.answer-input-wrapper {
+    position: relative;
+}
+
+.voice-controls {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-voice {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.recording-status {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: 10px;
+}
+
 .evaluation-container {
     margin-bottom: 30px;
 }
