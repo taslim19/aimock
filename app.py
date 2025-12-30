@@ -270,7 +270,15 @@ def interview(interview_id):
         return redirect(url_for('dashboard'))
 
     questions = Question.query.filter_by(interview_id=interview_id).order_by(Question.order_number).all()
-    return render_template('interview.html', interview=interview_obj, questions=questions)
+    # Convert SQLAlchemy objects to dictionaries for JSON serialization
+    questions_data = [{
+        'id': q.id,
+        'question_text': q.question_text,
+        'question_type': q.question_type,
+        'difficulty': q.difficulty,
+        'order_number': q.order_number
+    } for q in questions]
+    return render_template('interview.html', interview=interview_obj, questions=questions_data)
 
 
 @app.route('/submit-answer', methods=['POST'])
