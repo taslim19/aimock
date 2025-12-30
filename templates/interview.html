@@ -57,8 +57,8 @@ let currentQuestionIndex = 0;
 let answeredQuestions = 0;
 let recognition = null;
 let isRecording = false;
-let processedResults = new Set();  // Track processed result indices to avoid duplicates
-let lastFinalText = '';  // Track last final text to prevent duplicates
+let confirmedText = '';  // Text that has been confirmed (final results)
+let lastResultLength = 0;  // Track how many results we've processed
 
 // Initialize Web Speech API
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -72,70 +72,48 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const answerTextarea = document.getElementById('answerText');
         if (!answerTextarea) return;
         
-        // Get current text without interim marker
-        let currentText = answerTextarea.value.replace(/\s*\[interim\]\s*$/, '').trim();
-        
-        // Build transcript from all results
-        let allText = '';
+        // Process only NEW results (from lastResultLength onwards)
+        let newFinalText = '';
         let latestInterim = '';
         
-        // Process all results
-        for (let i = 0; i < event.results.length; i++) {
+        // Process results starting from where we left off
+        for (let i = lastResultLength; i < event.results.length; i++) {
             const result = event.results[i];
             const transcript = result[0].transcript.trim();
             
             if (result.isFinal) {
-                // Final result - add to allText
-                if (transcript) {
-                    allText += transcript + ' ';
+                // Only add final text if it's new
+                if (transcript && !confirmedText.includes(transcript)) {
+                    newFinalText += transcript + ' ';
+                    confirmedText += transcript + ' ';
                 }
             } else {
-                // Interim result - store latest
+                // Get latest interim result
                 if (i >= event.resultIndex) {
                     latestInterim = transcript;
                 }
             }
         }
         
-        // Remove duplicates: if currentText already contains the new text, don't add it again
-        allText = allText.trim();
-        if (allText) {
-            // Check if this text is already in currentText
-            const words = allText.split(/\s+/);
-            const currentWords = currentText.split(/\s+/);
-            
-            // Find where new words start (avoid duplicates)
-            let newWords = [];
-            let foundMatch = false;
-            
-            for (let i = 0; i < words.length; i++) {
-                // Check if this word sequence already exists in current text
-                let sequence = words.slice(i).join(' ');
-                if (currentText.includes(sequence)) {
-                    foundMatch = true;
-                    break;
-                }
-                newWords.push(words[i]);
-            }
-            
-            // Only add truly new words
-            if (newWords.length > 0 && !foundMatch) {
-                currentText = (currentText + ' ' + newWords.join(' ')).trim();
-            } else if (!foundMatch && allText) {
-                // If no match found, add the whole text
-                if (!currentText.includes(allText)) {
-                    currentText = (currentText + ' ' + allText).trim();
-                }
-            }
+        // Update lastResultLength to track what we've processed
+        lastResultLength = event.results.length;
+        
+        // Build the display text
+        let displayText = confirmedText.trim();
+        
+        // Add new final text
+        if (newFinalText.trim()) {
+            displayText = (displayText + ' ' + newFinalText.trim()).trim();
         }
         
-        // Update textarea
-        if (latestInterim && !allText) {
-            // Show interim text
-            answerTextarea.value = currentText + (currentText ? ' ' : '') + latestInterim + ' [interim]';
+        // Add interim text if no new final text
+        if (latestInterim && !newFinalText.trim()) {
+            // Remove any previous interim text from display
+            displayText = displayText.replace(/\s*\[interim\]\s*$/, '');
+            answerTextarea.value = displayText + (displayText ? ' ' : '') + latestInterim + ' [interim]';
         } else {
-            // Show final text
-            answerTextarea.value = currentText;
+            // Show confirmed text only
+            answerTextarea.value = displayText;
         }
     };
     
@@ -288,8 +266,8 @@ function startRecording() {
     }
     
     // Reset tracking when starting new recording
-    processedResults.clear();
-    lastFinalText = '';
+    confirmedText = '';
+    lastResultLength = 0;
     
     try {
         console.log('Starting speech recognition...');
@@ -350,8 +328,8 @@ function stopRecording() {
             console.error('Error stopping recognition:', e);
         }
         isRecording = false;
-        processedResults.clear(); // Reset tracking
-        lastFinalText = '';
+        confirmedText = ''; // Reset tracking
+        lastResultLength = 0;
         
         // Clean up any interim markers in the text
         const answerTextarea = document.getElementById('answerText');
