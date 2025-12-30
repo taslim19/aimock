@@ -57,7 +57,8 @@ let currentQuestionIndex = 0;
 let answeredQuestions = 0;
 let recognition = null;
 let isRecording = false;
-let lastProcessedIndex = 0;  // Track processed results to avoid duplicates
+let processedResults = new Set();  // Track processed result indices to avoid duplicates
+let lastFinalText = '';  // Track last final text to prevent duplicates
 
 // Initialize Web Speech API
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -71,42 +72,50 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const answerTextarea = document.getElementById('answerText');
         if (!answerTextarea) return;
         
-        // Get current text and remove any previous interim text marker
-        let currentText = answerTextarea.value;
-        const interimMarker = ' [interim]';
-        if (currentText.endsWith(interimMarker)) {
-            currentText = currentText.slice(0, -interimMarker.length);
-        }
+        // Get base text (remove interim marker if present)
+        let baseText = answerTextarea.value.replace(/\s*\[interim\]\s*$/, '');
         
-        let newFinalText = '';
-        let newInterimText = '';
+        // Build complete transcript from all results
+        let fullTranscript = '';
+        let hasFinal = false;
         
-        // Process only NEW results (from resultIndex onwards)
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        // Process all results, but only add each unique final result once
+        for (let i = 0; i < event.results.length; i++) {
             const result = event.results[i];
-            const transcript = result[0].transcript;
+            const transcript = result[0].transcript.trim();
             
             if (result.isFinal) {
-                // Final result - add to final text
-                newFinalText += transcript + ' ';
-            } else {
-                // Interim result - add to interim text
-                newInterimText += transcript;
+                // For final results, check if we've seen this exact text before
+                if (transcript && !lastFinalText.includes(transcript)) {
+                    fullTranscript += transcript + ' ';
+                    hasFinal = true;
+                }
             }
         }
         
-        // Update textarea: add new final text, then append interim if any
-        if (newFinalText) {
-            // Add final text (this replaces any previous interim)
-            currentText = currentText + newFinalText;
-            newInterimText = ''; // Clear interim when we have final
+        // Update lastFinalText if we have new final text
+        if (hasFinal && fullTranscript.trim()) {
+            lastFinalText = fullTranscript.trim();
+            baseText = baseText.replace(new RegExp(lastFinalText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+            baseText = (baseText.trim() + ' ' + fullTranscript.trim()).trim();
         }
         
-        // Update the textarea
-        if (newInterimText) {
-            answerTextarea.value = currentText + newInterimText + interimMarker;
+        // Get current interim text (if any)
+        let interimText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (!event.results[i].isFinal) {
+                interimText = event.results[i][0].transcript;
+                break; // Only show latest interim
+            }
+        }
+        
+        // Update textarea
+        if (interimText && !hasFinal) {
+            // Show interim text with marker
+            answerTextarea.value = baseText + (baseText ? ' ' : '') + interimText + ' [interim]';
         } else {
-            answerTextarea.value = currentText;
+            // Show final text only
+            answerTextarea.value = baseText;
         }
     };
     
@@ -259,7 +268,8 @@ function startRecording() {
     }
     
     // Reset tracking when starting new recording
-    lastProcessedIndex = 0;
+    processedResults.clear();
+    lastFinalText = '';
     
     try {
         console.log('Starting speech recognition...');
@@ -320,7 +330,8 @@ function stopRecording() {
             console.error('Error stopping recognition:', e);
         }
         isRecording = false;
-        lastProcessedIndex = 0; // Reset tracking
+        processedResults.clear(); // Reset tracking
+        lastFinalText = '';
         
         // Clean up any interim markers in the text
         const answerTextarea = document.getElementById('answerText');
