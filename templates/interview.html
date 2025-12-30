@@ -264,16 +264,35 @@ function startRecording() {
 }
 
 function stopRecording() {
+    console.log('stopRecording called, isRecording:', isRecording);
     if (recognition && isRecording) {
-        recognition.stop();
+        try {
+            recognition.stop();
+            console.log('Recognition stopped');
+        } catch (e) {
+            console.error('Error stopping recognition:', e);
+        }
         isRecording = false;
-        document.getElementById('startRecordingBtn').style.display = 'inline-block';
-        document.getElementById('stopRecordingBtn').style.display = 'none';
-        document.getElementById('recordingStatus').textContent = 'Recording stopped';
-        document.getElementById('recordingStatus').style.color = '#27ae60';
-        setTimeout(() => {
-            document.getElementById('recordingStatus').textContent = '';
-        }, 2000);
+        
+        const startBtn = document.getElementById('startRecordingBtn');
+        const stopBtn = document.getElementById('stopRecordingBtn');
+        const statusEl = document.getElementById('recordingStatus');
+        
+        if (startBtn) {
+            startBtn.style.display = 'inline-block';
+            console.log('Start button shown');
+        }
+        if (stopBtn) {
+            stopBtn.style.display = 'none';
+            console.log('Stop button hidden');
+        }
+        if (statusEl) {
+            statusEl.textContent = 'Recording stopped';
+            statusEl.style.color = '#27ae60';
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 2000);
+        }
     }
 }
 
