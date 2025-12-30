@@ -173,8 +173,25 @@ class AnswerEvaluator:
             question_doc = self.nlp(question_text)
             
             # Semantic similarity using word vectors
-            similarity = answer_doc.similarity(question_doc)
-            score += similarity * 30  # Add up to 30 points based on semantic similarity
+            # Check if model has word vectors (md/lg models) for accurate similarity
+            try:
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning, message=".*word vectors.*")
+                    similarity = answer_doc.similarity(question_doc)
+                
+                # Adjust weight based on whether word vectors are available
+                # Models with word vectors (md/lg) give more accurate similarity
+                if hasattr(self.nlp.vocab, 'vectors') and self.nlp.vocab.vectors.size > 0:
+                    similarity_weight = 30  # Full weight for models with word vectors
+                else:
+                    similarity_weight = 15  # Reduced weight for models without word vectors (sm)
+                
+                score += similarity * similarity_weight
+            except Exception as e:
+                # Fallback if similarity calculation fails
+                print(f"Similarity calculation warning: {e}")
+                # Continue with other scoring methods
             
             # Extract named entities and important terms
             question_entities = [ent.text.lower() for ent in question_doc.ents]
