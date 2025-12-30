@@ -57,6 +57,7 @@ let currentQuestionIndex = 0;
 let answeredQuestions = 0;
 let recognition = null;
 let isRecording = false;
+let lastProcessedIndex = 0;  // Track processed results to avoid duplicates
 
 // Initialize Web Speech API
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -67,35 +68,45 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.lang = 'en-US';
     
     recognition.onresult = function(event) {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        const answerTextarea = document.getElementById('answerText');
+        if (!answerTextarea) return;
         
+        // Get current text and remove any previous interim text marker
+        let currentText = answerTextarea.value;
+        const interimMarker = ' [interim]';
+        if (currentText.endsWith(interimMarker)) {
+            currentText = currentText.slice(0, -interimMarker.length);
+        }
+        
+        let newFinalText = '';
+        let newInterimText = '';
+        
+        // Process only NEW results (from resultIndex onwards)
         for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalTranscript += transcript + ' ';
+            const result = event.results[i];
+            const transcript = result[0].transcript;
+            
+            if (result.isFinal) {
+                // Final result - add to final text
+                newFinalText += transcript + ' ';
             } else {
-                interimTranscript += transcript;
+                // Interim result - add to interim text
+                newInterimText += transcript;
             }
         }
         
-        const answerTextarea = document.getElementById('answerText');
-        if (answerTextarea) {
-            // Get the base text (without interim results)
-            let baseText = answerTextarea.value;
-            // Remove any previous interim text (if any)
-            baseText = baseText.replace(/\s*\[interim\]\s*$/, '');
-            
-            // Add final transcript
-            if (finalTranscript) {
-                answerTextarea.value = baseText + finalTranscript;
-                baseText = answerTextarea.value;
-            }
-            
-            // Show interim results
-            if (interimTranscript) {
-                answerTextarea.value = baseText + ' ' + interimTranscript;
-            }
+        // Update textarea: add new final text, then append interim if any
+        if (newFinalText) {
+            // Add final text (this replaces any previous interim)
+            currentText = currentText + newFinalText;
+            newInterimText = ''; // Clear interim when we have final
+        }
+        
+        // Update the textarea
+        if (newInterimText) {
+            answerTextarea.value = currentText + newInterimText + interimMarker;
+        } else {
+            answerTextarea.value = currentText;
         }
     };
     
@@ -247,6 +258,9 @@ function startRecording() {
         return;
     }
     
+    // Reset tracking when starting new recording
+    lastProcessedIndex = 0;
+    
     try {
         console.log('Starting speech recognition...');
         recognition.start();
@@ -306,6 +320,13 @@ function stopRecording() {
             console.error('Error stopping recognition:', e);
         }
         isRecording = false;
+        lastProcessedIndex = 0; // Reset tracking
+        
+        // Clean up any interim markers in the text
+        const answerTextarea = document.getElementById('answerText');
+        if (answerTextarea) {
+            answerTextarea.value = answerTextarea.value.replace(/\s*\[interim\]\s*$/, '');
+        }
         
         const startBtn = document.getElementById('startRecordingBtn');
         const stopBtn = document.getElementById('stopRecordingBtn');
