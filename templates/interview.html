@@ -72,50 +72,70 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const answerTextarea = document.getElementById('answerText');
         if (!answerTextarea) return;
         
-        // Get base text (remove interim marker if present)
-        let baseText = answerTextarea.value.replace(/\s*\[interim\]\s*$/, '');
+        // Get current text without interim marker
+        let currentText = answerTextarea.value.replace(/\s*\[interim\]\s*$/, '').trim();
         
-        // Build complete transcript from all results
-        let fullTranscript = '';
-        let hasFinal = false;
+        // Build transcript from all results
+        let allText = '';
+        let latestInterim = '';
         
-        // Process all results, but only add each unique final result once
+        // Process all results
         for (let i = 0; i < event.results.length; i++) {
             const result = event.results[i];
             const transcript = result[0].transcript.trim();
             
             if (result.isFinal) {
-                // For final results, check if we've seen this exact text before
-                if (transcript && !lastFinalText.includes(transcript)) {
-                    fullTranscript += transcript + ' ';
-                    hasFinal = true;
+                // Final result - add to allText
+                if (transcript) {
+                    allText += transcript + ' ';
+                }
+            } else {
+                // Interim result - store latest
+                if (i >= event.resultIndex) {
+                    latestInterim = transcript;
                 }
             }
         }
         
-        // Update lastFinalText if we have new final text
-        if (hasFinal && fullTranscript.trim()) {
-            lastFinalText = fullTranscript.trim();
-            baseText = baseText.replace(new RegExp(lastFinalText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
-            baseText = (baseText.trim() + ' ' + fullTranscript.trim()).trim();
-        }
-        
-        // Get current interim text (if any)
-        let interimText = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (!event.results[i].isFinal) {
-                interimText = event.results[i][0].transcript;
-                break; // Only show latest interim
+        // Remove duplicates: if currentText already contains the new text, don't add it again
+        allText = allText.trim();
+        if (allText) {
+            // Check if this text is already in currentText
+            const words = allText.split(/\s+/);
+            const currentWords = currentText.split(/\s+/);
+            
+            // Find where new words start (avoid duplicates)
+            let newWords = [];
+            let foundMatch = false;
+            
+            for (let i = 0; i < words.length; i++) {
+                // Check if this word sequence already exists in current text
+                let sequence = words.slice(i).join(' ');
+                if (currentText.includes(sequence)) {
+                    foundMatch = true;
+                    break;
+                }
+                newWords.push(words[i]);
+            }
+            
+            // Only add truly new words
+            if (newWords.length > 0 && !foundMatch) {
+                currentText = (currentText + ' ' + newWords.join(' ')).trim();
+            } else if (!foundMatch && allText) {
+                // If no match found, add the whole text
+                if (!currentText.includes(allText)) {
+                    currentText = (currentText + ' ' + allText).trim();
+                }
             }
         }
         
         // Update textarea
-        if (interimText && !hasFinal) {
-            // Show interim text with marker
-            answerTextarea.value = baseText + (baseText ? ' ' : '') + interimText + ' [interim]';
+        if (latestInterim && !allText) {
+            // Show interim text
+            answerTextarea.value = currentText + (currentText ? ' ' : '') + latestInterim + ' [interim]';
         } else {
-            // Show final text only
-            answerTextarea.value = baseText;
+            // Show final text
+            answerTextarea.value = currentText;
         }
     };
     
