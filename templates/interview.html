@@ -102,14 +102,34 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onerror = function(event) {
         console.error('Speech recognition error:', event.error, event);
         const statusEl = document.getElementById('recordingStatus');
+        
+        // Handle specific error types
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            if (statusEl) {
+                statusEl.textContent = '❌ Microphone blocked - Allow in browser settings';
+                statusEl.style.color = '#e74c3c';
+            }
+            alert('Microphone access denied!\n\nPlease:\n1. Click the lock icon (🔒) in address bar\n2. Allow Microphone\n3. Refresh page');
+            stopRecording();
+            return;
+        }
+        
         if (statusEl) {
             statusEl.textContent = 'Error: ' + event.error;
             statusEl.style.color = '#e74c3c';
         }
         
         // Don't auto-stop on certain errors
-        if (event.error === 'no-speech' || event.error === 'audio-capture') {
-            // These are recoverable, keep trying
+        if (event.error === 'no-speech') {
+            // No speech detected, but keep trying
+            return;
+        }
+        
+        if (event.error === 'audio-capture') {
+            // Audio capture issue - might be permission
+            if (statusEl) {
+                statusEl.textContent = '⚠️ Check microphone connection';
+            }
             return;
         }
         
@@ -256,7 +276,20 @@ function startRecording() {
         if (e.name === 'InvalidStateError') {
             alert('Recording is already active. Please stop it first.');
         } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-            alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+            const helpMsg = 'Microphone access is blocked!\n\n' +
+                'To enable:\n' +
+                '1. Click the lock icon (🔒) in your browser address bar\n' +
+                '2. Find "Microphone" and change to "Allow"\n' +
+                '3. Or go to browser Settings → Privacy → Site Settings → Microphone\n' +
+                '4. Refresh this page and try again';
+            alert(helpMsg);
+            
+            // Update status
+            const statusEl = document.getElementById('recordingStatus');
+            if (statusEl) {
+                statusEl.textContent = '❌ Microphone blocked - Check browser settings';
+                statusEl.style.color = '#e74c3c';
+            }
         } else {
             alert('Could not start voice recording: ' + e.message + '\n\nError: ' + e.name);
         }
