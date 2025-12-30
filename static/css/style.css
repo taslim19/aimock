@@ -590,6 +590,10 @@ body {
 .btn-voice {
     padding: 8px 16px;
     font-size: 0.9rem;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 10;
+    position: relative;
 }
 
 .recording-status {

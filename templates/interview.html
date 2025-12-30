@@ -55,6 +55,73 @@ const interviewId = {{ interview.id }};
 const questions = {{ questions|tojson }};
 let currentQuestionIndex = 0;
 let answeredQuestions = 0;
+let recognition = null;
+let isRecording = false;
+
+// Initialize Web Speech API
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' ';
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+        
+        const answerTextarea = document.getElementById('answerText');
+        if (answerTextarea) {
+            // Get the base text (without interim results)
+            let baseText = answerTextarea.value;
+            // Remove any previous interim text (if any)
+            baseText = baseText.replace(/\s*\[interim\]\s*$/, '');
+            
+            // Add final transcript
+            if (finalTranscript) {
+                answerTextarea.value = baseText + finalTranscript;
+                baseText = answerTextarea.value;
+            }
+            
+            // Show interim results
+            if (interimTranscript) {
+                answerTextarea.value = baseText + ' ' + interimTranscript;
+            }
+        }
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        const statusEl = document.getElementById('recordingStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Error: ' + event.error;
+            statusEl.style.color = '#e74c3c';
+        }
+        stopRecording();
+    };
+    
+    recognition.onend = function() {
+        if (isRecording) {
+            // Auto-restart if still recording
+            try {
+                recognition.start();
+            } catch (e) {
+                stopRecording();
+            }
+        }
+    };
+} else {
+    console.warn('Speech recognition not supported in this browser');
+}
 
 function loadQuestion() {
     if (currentQuestionIndex >= questions.length) {
@@ -95,13 +162,23 @@ function loadQuestion() {
 
     document.getElementById('submitAnswerBtn').addEventListener('click', submitAnswer);
     
-    // Voice input handlers
-    if (recognition) {
-        document.getElementById('startRecordingBtn').addEventListener('click', startRecording);
-        document.getElementById('stopRecordingBtn').addEventListener('click', stopRecording);
-    } else {
-        // Hide voice buttons if not supported
-        document.querySelector('.voice-controls').style.display = 'none';
+    // Voice input handlers - always attach, function will handle unsupported browsers
+    const startBtn = document.getElementById('startRecordingBtn');
+    const stopBtn = document.getElementById('stopRecordingBtn');
+    
+    if (startBtn) {
+        startBtn.addEventListener('click', startRecording);
+    }
+    if (stopBtn) {
+        stopBtn.addEventListener('click', stopRecording);
+    }
+    
+    // Hide voice controls if not supported
+    if (!recognition) {
+        const voiceControls = document.querySelector('.voice-controls');
+        if (voiceControls) {
+            voiceControls.style.display = 'none';
+        }
     }
     
     updateProgress();
@@ -109,21 +186,42 @@ function loadQuestion() {
 
 function startRecording() {
     if (!recognition) {
-        alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+        alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
         return;
     }
     
-    try {
-        recognition.start();
-        isRecording = true;
-        document.getElementById('startRecordingBtn').style.display = 'none';
-        document.getElementById('stopRecordingBtn').style.display = 'inline-block';
-        document.getElementById('recordingStatus').textContent = '🔴 Recording...';
-        document.getElementById('recordingStatus').style.color = '#e74c3c';
-    } catch (e) {
-        console.error('Error starting recognition:', e);
-        alert('Could not start voice recording. Please try again.');
-    }
+    // Request microphone permission
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function(stream) {
+            // Permission granted, stop the stream and start recognition
+            stream.getTracks().forEach(track => track.stop());
+            
+            try {
+                recognition.start();
+                isRecording = true;
+                const startBtn = document.getElementById('startRecordingBtn');
+                const stopBtn = document.getElementById('stopRecordingBtn');
+                const statusEl = document.getElementById('recordingStatus');
+                
+                if (startBtn) startBtn.style.display = 'none';
+                if (stopBtn) stopBtn.style.display = 'inline-block';
+                if (statusEl) {
+                    statusEl.textContent = '🔴 Recording...';
+                    statusEl.style.color = '#e74c3c';
+                }
+            } catch (e) {
+                console.error('Error starting recognition:', e);
+                if (e.name === 'InvalidStateError') {
+                    alert('Recording is already active. Please stop it first.');
+                } else {
+                    alert('Could not start voice recording: ' + e.message);
+                }
+            }
+        })
+        .catch(function(err) {
+            console.error('Microphone permission denied:', err);
+            alert('Microphone access is required for voice input. Please allow microphone access and try again.');
+        });
 }
 
 function stopRecording() {
