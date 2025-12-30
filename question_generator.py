@@ -17,17 +17,19 @@ class QuestionGenerator:
     """Generates interview questions using NLP (spaCy) and domain knowledge"""
     
     def __init__(self):
-        # Load spaCy model if available
+        # Load spaCy model if available (try models with word vectors first)
+        self.nlp = None
+        self.spacy_available = False
+        
         if SPACY_AVAILABLE:
-            try:
-                self.nlp = spacy.load("en_core_web_sm")
-                self.spacy_available = True
-            except OSError:
-                self.nlp = None
-                self.spacy_available = False
-        else:
-            self.nlp = None
-            self.spacy_available = False
+            models_to_try = ["en_core_web_md", "en_core_web_lg", "en_core_web_sm"]
+            for model_name in models_to_try:
+                try:
+                    self.nlp = spacy.load(model_name)
+                    self.spacy_available = True
+                    break
+                except OSError:
+                    continue
         
         self.domain_knowledge = self._load_domain_knowledge()
         self.question_templates = self._load_question_templates()

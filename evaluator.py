@@ -14,15 +14,31 @@ class AnswerEvaluator:
     """Evaluates interview answers using advanced NLP (spaCy) and multiple criteria"""
     
     def __init__(self):
-        # Load spaCy model (try to load, fallback to basic if not available)
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-            self.spacy_available = True
-        except OSError:
-            # Model not installed, will use basic processing
-            self.nlp = None
-            self.spacy_available = False
-            print("Warning: spaCy model 'en_core_web_sm' not found. Install with: python -m spacy download en_core_web_sm")
+        # Load spaCy model (try larger models with word vectors first, fallback to smaller)
+        self.nlp = None
+        self.spacy_available = False
+        
+        # Try models in order of preference (larger = better similarity, but slower)
+        models_to_try = [
+            "en_core_web_md",  # Medium model with word vectors (recommended)
+            "en_core_web_lg",  # Large model with word vectors (best accuracy)
+            "en_core_web_sm"    # Small model without word vectors (fallback)
+        ]
+        
+        for model_name in models_to_try:
+            try:
+                self.nlp = spacy.load(model_name)
+                self.spacy_available = True
+                if model_name == "en_core_web_sm":
+                    print(f"Warning: Using {model_name} without word vectors. For better similarity accuracy, install 'en_core_web_md' with: python -m spacy download en_core_web_md")
+                else:
+                    print(f"Loaded spaCy model: {model_name} (with word vectors)")
+                break
+            except OSError:
+                continue
+        
+        if not self.spacy_available:
+            print("Warning: No spaCy model found. Install with: python -m spacy download en_core_web_md")
         
         self.quality_indicators = {
             'positive': [

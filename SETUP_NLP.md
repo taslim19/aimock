@@ -12,11 +12,20 @@ pip install -r requirements.txt
 
 ### 2. Download spaCy English Model
 
-After installing spaCy, you need to download the English language model:
+After installing spaCy, you need to download the English language model. **We recommend the medium model** for better accuracy:
 
 ```bash
-python -m spacy download en_core_web_sm
+# Recommended: Medium model with word vectors (better similarity accuracy)
+python -m spacy download en_core_web_md
+
+# Alternative: Large model (best accuracy, but larger ~560MB)
+# python -m spacy download en_core_web_lg
+
+# Fallback: Small model (works but less accurate similarity)
+# python -m spacy download en_core_web_sm
 ```
+
+**Note**: The system will automatically try to use the best available model (md > lg > sm).
 
 ### 3. Verify Installation
 
@@ -55,6 +64,10 @@ If spaCy is not installed, the system will:
 
 **Solution:**
 ```bash
+# Install the recommended model with word vectors
+python -m spacy download en_core_web_md
+
+# Or if you prefer the small model (less accurate)
 python -m spacy download en_core_web_sm
 ```
 
@@ -63,7 +76,7 @@ python -m spacy download en_core_web_sm
 **Solution:**
 ```bash
 pip install spacy
-python -m spacy download en_core_web_sm
+python -m spacy download en_core_web_md
 ```
 
 ### Model Download Fails
@@ -81,11 +94,13 @@ Then update `evaluator.py` and `question_generator.py` to use `en_core_web_lg` i
 
 ## Performance Notes
 
-- **en_core_web_sm**: Small model (~12MB), faster, good for most use cases
-- **en_core_web_md**: Medium model (~40MB), better accuracy
+- **en_core_web_sm**: Small model (~12MB), faster, but **no word vectors** (less accurate similarity)
+- **en_core_web_md**: Medium model (~40MB), **includes word vectors** (recommended for best balance)
 - **en_core_web_lg**: Large model (~560MB), best accuracy but slower
 
-The default uses `en_core_web_sm` for a good balance of speed and accuracy.
+**The system automatically uses the best available model** (tries md → lg → sm in order).
+
+**For accurate semantic similarity scoring, use `en_core_web_md` or larger.**
 
 ## Next Steps
 
