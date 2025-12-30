@@ -1,17 +1,34 @@
 """
 AI Question Generator Module
-Generates interview questions based on domain and difficulty
+Generates interview questions using NLP (spaCy) and domain knowledge
 """
 
 import random
 import json
 import re
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
 
 
 class QuestionGenerator:
-    """Generates interview questions using NLP-based templates and domain knowledge"""
+    """Generates interview questions using NLP (spaCy) and domain knowledge"""
     
     def __init__(self):
+        # Load spaCy model if available
+        if SPACY_AVAILABLE:
+            try:
+                self.nlp = spacy.load("en_core_web_sm")
+                self.spacy_available = True
+            except OSError:
+                self.nlp = None
+                self.spacy_available = False
+        else:
+            self.nlp = None
+            self.spacy_available = False
+        
         self.domain_knowledge = self._load_domain_knowledge()
         self.question_templates = self._load_question_templates()
     

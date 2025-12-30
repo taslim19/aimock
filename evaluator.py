@@ -1,17 +1,29 @@
 """
 Answer Evaluator Module
-Evaluates user answers using rule-based scoring and NLP techniques
+Evaluates user answers using advanced NLP (spaCy) and rule-based scoring
 """
 
 import re
 import json
 from collections import Counter
+import spacy
+from spacy.lang.en.stop_words import STOP_WORDS
 
 
 class AnswerEvaluator:
-    """Evaluates interview answers based on multiple criteria"""
+    """Evaluates interview answers using advanced NLP (spaCy) and multiple criteria"""
     
     def __init__(self):
+        # Load spaCy model (try to load, fallback to basic if not available)
+        try:
+            self.nlp = spacy.load("en_core_web_sm")
+            self.spacy_available = True
+        except OSError:
+            # Model not installed, will use basic processing
+            self.nlp = None
+            self.spacy_available = False
+            print("Warning: spaCy model 'en_core_web_sm' not found. Install with: python -m spacy download en_core_web_sm")
+        
         self.quality_indicators = {
             'positive': [
                 'experience', 'implemented', 'successful', 'achieved', 'improved',
@@ -84,7 +96,7 @@ class AnswerEvaluator:
         }
     
     def _evaluate_clarity(self, answer_text, answer_length):
-        """Evaluate clarity of the answer"""
+        """Evaluate clarity of the answer using NLP"""
         score = 50.0  # Base score
         
         # Length check
@@ -93,14 +105,38 @@ class AnswerEvaluator:
         if self.minimum_length <= answer_length <= self.ideal_length * 2:
             score += 10
         
-        # Sentence structure
-        sentences = re.split(r'[.!?]+', answer_text)
-        if len(sentences) > 1:
-            score += 10
-        
-        # Check for proper punctuation
-        if any(punct in answer_text for punct in ['.', '!', '?']):
-            score += 5
+        # Use spaCy for advanced sentence analysis if available
+        if self.spacy_available and self.nlp:
+            doc = self.nlp(answer_text)
+            sentences = list(doc.sents)
+            
+            # Sentence structure analysis
+            if len(sentences) > 1:
+                score += 10
+            
+            # Check sentence complexity (average sentence length)
+            avg_sentence_length = sum(len(sent) for sent in sentences) / len(sentences) if sentences else 0
+            if 10 <= avg_sentence_length <= 30:  # Optimal sentence length
+                score += 10
+            elif avg_sentence_length > 50:  # Too complex
+                score -= 5
+            
+            # Check for proper punctuation using spaCy
+            if any(token.is_punct for token in doc):
+                score += 5
+            
+            # Check grammatical structure (POS tags)
+            has_verbs = any(token.pos_ == "VERB" for token in doc)
+            has_nouns = any(token.pos_ == "NOUN" for token in doc)
+            if has_verbs and has_nouns:
+                score += 5
+        else:
+            # Fallback to basic analysis
+            sentences = re.split(r'[.!?]+', answer_text)
+            if len(sentences) > 1:
+                score += 10
+            if any(punct in answer_text for punct in ['.', '!', '?']):
+                score += 5
         
         # Check for capitalization
         if answer_text[0].isupper():
@@ -109,20 +145,47 @@ class AnswerEvaluator:
         return min(score, 100.0)
     
     def _evaluate_accuracy(self, answer_text, question_text, difficulty):
-        """Evaluate accuracy and relevance of the answer"""
+        """Evaluate accuracy and relevance using NLP semantic similarity"""
         score = 40.0  # Base score
         
         answer_lower = answer_text.lower()
         question_lower = question_text.lower()
         
-        # Extract key terms from question
-        question_keywords = self._extract_keywords(question_text)
-        answer_keywords = self._extract_keywords(answer_text)
-        
-        # Check keyword overlap
-        overlap = len(set(question_keywords) & set(answer_keywords))
-        if overlap > 0:
-            score += min(overlap * 10, 30)
+        # Use spaCy for advanced semantic analysis if available
+        if self.spacy_available and self.nlp:
+            answer_doc = self.nlp(answer_text)
+            question_doc = self.nlp(question_text)
+            
+            # Semantic similarity using word vectors
+            similarity = answer_doc.similarity(question_doc)
+            score += similarity * 30  # Add up to 30 points based on semantic similarity
+            
+            # Extract named entities and important terms
+            question_entities = [ent.text.lower() for ent in question_doc.ents]
+            answer_entities = [ent.text.lower() for ent in answer_doc.ents]
+            
+            # Check entity overlap
+            entity_overlap = len(set(question_entities) & set(answer_entities))
+            if entity_overlap > 0:
+                score += min(entity_overlap * 5, 15)
+            
+            # Extract key nouns and verbs from question
+            question_keywords = [token.lemma_.lower() for token in question_doc 
+                               if token.pos_ in ['NOUN', 'VERB'] and not token.is_stop]
+            answer_keywords = [token.lemma_.lower() for token in answer_doc 
+                             if token.pos_ in ['NOUN', 'VERB'] and not token.is_stop]
+            
+            # Check keyword overlap (using lemmatized forms)
+            overlap = len(set(question_keywords) & set(answer_keywords))
+            if overlap > 0:
+                score += min(overlap * 3, 20)
+        else:
+            # Fallback to basic keyword extraction
+            question_keywords = self._extract_keywords(question_text)
+            answer_keywords = self._extract_keywords(answer_text)
+            overlap = len(set(question_keywords) & set(answer_keywords))
+            if overlap > 0:
+                score += min(overlap * 10, 30)
         
         # Check for technical terms (for technical questions)
         if any(word in question_lower for word in ['explain', 'what is', 'difference', 'how']):
@@ -143,8 +206,31 @@ class AnswerEvaluator:
         return min(score, 100.0)
     
     def _evaluate_communication(self, answer_text, answer_lower):
-        """Evaluate communication quality"""
+        """Evaluate communication quality using NLP"""
         score = 50.0  # Base score
+        
+        # Use spaCy for advanced communication analysis
+        if self.spacy_available and self.nlp:
+            doc = self.nlp(answer_text)
+            
+            # Check for transition words (adverbs and conjunctions)
+            transition_words = ['first', 'second', 'then', 'finally', 'additionally', 
+                              'however', 'therefore', 'moreover', 'furthermore', 'consequently']
+            transition_count = sum(1 for token in doc 
+                                 if token.lemma_.lower() in transition_words)
+            score += min(transition_count * 5, 15)
+            
+            # Check for discourse markers (conjunctions)
+            conjunctions = sum(1 for token in doc if token.pos_ == "CCONJ" or token.pos_ == "SCONJ")
+            if conjunctions > 0:
+                score += min(conjunctions * 2, 10)
+            
+            # Check sentence variety (different sentence structures)
+            sentence_lengths = [len(list(sent)) for sent in doc.sents]
+            if len(sentence_lengths) > 1:
+                length_variance = max(sentence_lengths) - min(sentence_lengths)
+                if length_variance > 5:  # Good variety
+                    score += 5
         
         # Check for communication-related keywords
         comm_keywords = sum(1 for word in self.quality_indicators['communication'] 
@@ -192,18 +278,33 @@ class AnswerEvaluator:
         return max(min(score, 100.0), 0.0)
     
     def _extract_keywords(self, text):
-        """Extract important keywords from text"""
-        # Remove common stop words
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
-                     'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were',
-                     'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
-                     'will', 'would', 'should', 'could', 'may', 'might', 'must',
-                     'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'}
-        
-        words = re.findall(r'\b\w+\b', text.lower())
-        keywords = [w for w in words if w not in stop_words and len(w) > 3]
-        
-        return keywords[:10]  # Return top 10 keywords
+        """Extract important keywords using NLP"""
+        if self.spacy_available and self.nlp:
+            doc = self.nlp(text)
+            # Extract nouns, verbs, and adjectives (excluding stop words)
+            keywords = [token.lemma_.lower() for token in doc 
+                       if token.pos_ in ['NOUN', 'VERB', 'ADJ'] 
+                       and not token.is_stop 
+                       and not token.is_punct
+                       and len(token.text) > 3]
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_keywords = []
+            for kw in keywords:
+                if kw not in seen:
+                    seen.add(kw)
+                    unique_keywords.append(kw)
+            return unique_keywords[:15]  # Return top 15 keywords
+        else:
+            # Fallback to basic extraction
+            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
+                         'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were',
+                         'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+                         'will', 'would', 'should', 'could', 'may', 'might', 'must',
+                         'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'}
+            words = re.findall(r'\b\w+\b', text.lower())
+            keywords = [w for w in words if w not in stop_words and len(w) > 3]
+            return keywords[:10]  # Return top 10 keywords
     
     def _generate_feedback(self, clarity, accuracy, communication, confidence, overall, answer_text, length):
         """Generate detailed feedback"""
